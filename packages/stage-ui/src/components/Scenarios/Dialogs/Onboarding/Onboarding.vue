@@ -40,7 +40,7 @@ const {
 
 // Popular providers for first-time setup
 const popularProviders = computed(() => {
-  const popular = ['openai', 'anthropic', 'google-generative-ai', 'openrouter-ai', 'ollama', 'deepseek', 'player2']
+  const popular = ['openai', 'anthropic', 'google-generative-ai', 'openrouter-ai', 'ollama', 'ollama-llama', 'deepseek', 'player2']
   return allChatProvidersMetadata.value
     .filter(provider => popular.includes(provider.id))
     .sort((a, b) => popular.indexOf(a.id) - popular.indexOf(b.id))
@@ -66,13 +66,13 @@ const validationMessage = ref('')
 const needsApiKey = computed(() => {
   if (!selectedProvider.value)
     return false
-  return selectedProvider.value.id !== 'ollama' && selectedProvider.value.id !== 'player2'
+  return selectedProvider.value.id !== 'ollama' && selectedProvider.value.id !== 'player2' && selectedProvider.value.id !== 'ollama-llama'
 })
 
 const needsBaseUrl = computed(() => {
   if (!selectedProvider.value)
     return false
-  return selectedProvider.value.id !== 'cloudflare-workers-ai'
+  return selectedProvider.value.id !== 'cloudflare-workers-ai' && selectedProvider.value.id !== 'ollama-llama'
 })
 
 const canSave = computed(() => {

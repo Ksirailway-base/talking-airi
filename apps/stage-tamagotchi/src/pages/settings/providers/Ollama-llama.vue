@@ -13,8 +13,10 @@ import { FieldSelect } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import OllamaModelDownloader from '@proj-airi/stage-ui/components/Scenarios/Providers/OllamaModelDownloader.vue'
+import { useI18n } from 'vue-i18n'
+import HuggingFaceModelDownloader from '@proj-airi/stage-ui/components/providers/ollama-llama/HuggingFaceModelDownloader.vue'
 
+const { t } = useI18n()
 const router = useRouter()
 const providersStore = useProvidersStore()
 const { providers } = storeToRefs(providersStore)
@@ -23,7 +25,7 @@ const providerId = 'ollama-llama'
 const defaultModel = 'Meta-Llama-3-8B-Instruct.Q4_K_M.gguf'
 
 const llamaModels = [
-  { label: '🌟 LLaMA 3 8B Instruct Q4_K_M (4.9 GB) - Рекомендуется', value: 'Meta-Llama-3-8B-Instruct.Q4_K_M.gguf' },
+  { label: '🌟 LLaMA 3 8B Instruct Q4_K_M (4.9 GB) - Recommended', value: 'Meta-Llama-3-8B-Instruct.Q4_K_M.gguf' },
 ]
 
 const selectedModel = computed({
@@ -77,29 +79,16 @@ onMounted(() => {
   >
     <ProviderSettingsContainer>
       <ProviderBasicSettings
-        title="Basic Settings"
-        description="Configure Ollama server and select LLaMA model"
+        title="HuggingFace Models"
+        description="Download and manage LLaMA models from HuggingFace"
         :on-reset="handleResetSettings"
       >
-        <ProviderBaseUrlInput
-          v-model="baseUrl"
-          :placeholder="providerMetadata?.defaultOptions?.().baseUrl as string || ''"
-          required
-        />
-        
-        <FieldSelect
-          v-model="selectedModel"
-          label="LLaMA Model"
-          description="Select LLaMA model for chat. Larger models are more capable but require more memory."
-          :options="llamaModels"
-          layout="vertical"
-        />
+        <!-- Base URL and Model dropdown removed as requested -->
       </ProviderBasicSettings>
       
       <!-- Model Downloader Section -->
-      <div v-if="baseUrl" class="mt-6">
-        <OllamaModelDownloader
-          :base-url="baseUrl.replace('/v1/', '')"
+      <div class="mt-6">
+        <HuggingFaceModelDownloader
           @model-downloaded="handleModelDownloaded"
         />
       </div>

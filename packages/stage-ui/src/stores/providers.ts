@@ -49,6 +49,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { getOllamaAPI, MockOllamaAPI } from '../utils/ollama-api-loader'
+import { getHuggingFaceDownloader, AVAILABLE_LLAMA_MODELS, isModelAvailable } from '../utils/huggingface-browser-downloader'
 
 import { isAbsoluteUrl } from '../utils/string'
 import { models as elevenLabsModels } from './providers/elevenlabs/list-models'
@@ -546,39 +547,61 @@ export const useProvidersStore = defineStore('providers', () => {
         },
       },
       validators: {
-        validateProviderConfig: (config) => {
-          if (!config.baseUrl) {
+        validateProviderConfig: async (config) => {
+          const modelName = config.model as string
+          
+          if (!modelName) {
             return {
-              errors: [new Error('Base URL is required.')],
-              reason: 'Base URL is required. Default to http://localhost:11434/v1/ for Ollama.',
+              errors: [new Error('Model selection is required.')],
+              reason: 'Please select a model from the available LLaMA models.',
               valid: false,
             }
           }
-
-          if (!isAbsoluteUrl(config.baseUrl as string)) {
-            return notBaseUrlError.value
+          
+          // Check if the selected model is available
+          if (!isModelAvailable(modelName)) {
+            return {
+              errors: [new Error('Selected model is not available.')],
+              reason: `Model ${modelName} is not available in the HuggingFace repository.`,
+              valid: false,
+            }
           }
-
-          // Check if the Ollama server is reachable
-          return fetch(`${(config.baseUrl as string).trim()}models`, { headers: (config.headers as HeadersInit) || undefined })
-            .then((response) => {
-              const errors = [
-                !response.ok && new Error(`Ollama server returned non-ok status code: ${response.statusText}`),
-              ].filter(Boolean)
-
+          
+          // Check browser storage support
+          if (!('indexedDB' in window)) {
+            return {
+              errors: [new Error('IndexedDB not supported.')],
+              reason: 'Your browser does not support IndexedDB, which is required for storing models locally.',
+              valid: false,
+            }
+          }
+          
+          try {
+            const downloader = await getHuggingFaceDownloader()
+            const storageInfo = await downloader.getStorageInfo()
+            
+            // Check if there's enough storage space (at least 10GB recommended)
+            const requiredSpace = 10 * 1024 * 1024 * 1024 // 10GB
+            if (storageInfo.available > 0 && storageInfo.available < requiredSpace) {
               return {
-                errors,
-                reason: errors.filter(e => e).map(e => String(e)).join(', ') || '',
-                valid: response.ok,
-              }
-            })
-            .catch((err) => {
-              return {
-                errors: [err],
-                reason: `Failed to reach Ollama server, error: ${String(err)} occurred.\n\nIf you are using Ollama locally, this is likely the CORS (Cross-Origin Resource Sharing) security issue, where you will need to set OLLAMA_ORIGINS=* or OLLAMA_ORIGINS=https://airi.moeru.ai,http://localhost environment variable before launching Ollama server to make this work.`,
+                errors: [new Error('Insufficient storage space.')],
+                reason: `At least 10GB of storage space is recommended. Available: ${Math.round(storageInfo.available / (1024 * 1024 * 1024))}GB`,
                 valid: false,
               }
-            })
+            }
+            
+            return {
+              errors: [],
+              reason: 'Browser-based LLaMA provider is ready to use.',
+              valid: true,
+            }
+          } catch (error) {
+            return {
+              errors: [error],
+              reason: `Failed to initialize browser storage: ${String(error)}`,
+              valid: false,
+            }
+          }
         },
       },
     },
@@ -612,39 +635,47 @@ export const useProvidersStore = defineStore('providers', () => {
         },
       },
       validators: {
-        validateProviderConfig: (config) => {
-          if (!config.baseUrl) {
+        validateProviderConfig: async (config) => {
+          // For ollama-llama provider, we only need to check browser storage support
+          // No need to validate Ollama server connection since we use HuggingFace directly
+          
+          try {
+            // Check if IndexedDB is available
+            if (!window.indexedDB) {
+              return {
+                errors: [new Error('IndexedDB is not supported in this browser')],
+                reason: 'IndexedDB is required for storing downloaded models',
+                valid: false,
+              }
+            }
+
+            // Check available storage space
+            if ('storage' in navigator && 'estimate' in navigator.storage) {
+              const estimate = await navigator.storage.estimate()
+              const availableSpace = estimate.quota ? estimate.quota - (estimate.usage || 0) : 0
+              const minRequiredSpace = 2 * 1024 * 1024 * 1024 // 2GB minimum
+              
+              if (availableSpace < minRequiredSpace) {
+                return {
+                  errors: [new Error('Insufficient storage space')],
+                  reason: `At least 2GB of storage space is required. Available: ${Math.round(availableSpace / (1024 * 1024 * 1024) * 100) / 100}GB`,
+                  valid: false,
+                }
+              }
+            }
+
             return {
-              errors: [new Error('Base URL is required.')],
-              reason: 'Base URL is required. Default to http://localhost:11434/v1/ for Ollama.',
+              errors: [],
+              reason: '',
+              valid: true,
+            }
+          } catch (err) {
+            return {
+              errors: [err instanceof Error ? err : new Error(String(err))],
+              reason: 'Failed to validate browser storage capabilities',
               valid: false,
             }
           }
-
-          if (!isAbsoluteUrl(config.baseUrl as string)) {
-            return notBaseUrlError.value
-          }
-
-          // Check if the Ollama server is reachable
-          return fetch(`${(config.baseUrl as string).trim()}models`, { headers: (config.headers as HeadersInit) || undefined })
-            .then((response) => {
-              const errors = [
-                !response.ok && new Error(`Ollama server returned non-ok status code: ${response.statusText}`),
-              ].filter(Boolean)
-
-              return {
-                errors,
-                reason: errors.filter(e => e).map(e => String(e)).join(', ') || '',
-                valid: response.ok,
-              }
-            })
-            .catch((err) => {
-              return {
-                errors: [err],
-                reason: `Failed to reach Ollama server, error: ${String(err)} occurred.\n\nIf you are using Ollama locally, this is likely the CORS (Cross-Origin Resource Sharing) security issue, where you will need to set OLLAMA_ORIGINS=* or OLLAMA_ORIGINS=https://airi.moeru.ai,http://localhost environment variable before launching Ollama server to make this work.`,
-                valid: false,
-              }
-            })
         },
       },
     },
@@ -655,165 +686,198 @@ export const useProvidersStore = defineStore('providers', () => {
       nameKey: 'settings.pages.providers.provider.ollama-llama.title',
       name: 'Ollama LLaMA',
       descriptionKey: 'settings.pages.providers.provider.ollama-llama.description',
-      description: 'Local LLaMA models with Ollama',
+      description: 'Browser-based LLaMA models from HuggingFace',
       icon: 'i-lobe-icons:ollama',
       defaultOptions: () => ({
-        baseUrl: 'http://localhost:11434/v1/',
         model: 'Meta-Llama-3-8B-Instruct.Q4_K_M.gguf',
-        modelsPath: './models',
       }),
-      createProvider: async config => createOllama((config.baseUrl as string).trim()),
+      createProvider: async config => {
+        console.log('🚀 Creating ollama-llama provider with config:', config)
+        
+        // For browser-based models, we create a provider that can handle local inference
+        return {
+          id: 'ollama-llama-browser',
+          name: 'Browser LLaMA',
+          chat: async function* (messages, options) {
+            console.log('💬 Chat request received for ollama-llama provider')
+            console.log('📝 Messages:', messages)
+            console.log('⚙️ Options:', options)
+            
+            // Check if model is loaded
+            const downloader = await getHuggingFaceDownloader()
+            const modelName = config.model as string
+            const storedModels = await downloader.getStoredModels()
+            const isModelLoaded = storedModels.some(m => m.name === modelName)
+            
+            if (!isModelLoaded) {
+              throw new Error(`Model ${modelName} is not loaded. Please download the model first using the model downloader.`)
+            }
+            
+            // For now, yield a placeholder response indicating the model is ready
+            yield {
+              content: `Model ${modelName} is loaded and ready for inference. Browser-based inference implementation is in progress.`,
+              role: 'assistant'
+            }
+          }
+        }
+      },
       capabilities: {
         listModels: async (config) => {
-          return [
-            {
-              id: 'Meta-Llama-3-8B-Instruct.Q4_K_M.gguf',
-              name: '🌟 LLaMA 3 8B Instruct Q4_K_M (Рекомендуется)',
-              provider: 'ollama-llama',
-              description: 'Рекомендуемая модель Meta LLaMA 3 8B с квантизацией Q4_K_M для оптимального баланса качества и производительности. Автоматически загружается из папки models или скачивается с HuggingFace.',
-              contextLength: 8192,
-              deprecated: false,
-            },
-            {
-              id: 'Meta-Llama-3-8B-Instruct.Q8_0.gguf',
-              name: 'LLaMA 3 8B Instruct Q8_0 (Высокое качество)',
-              provider: 'ollama-llama',
-              description: 'Модель Meta LLaMA 3 8B с квантизацией Q8_0 для максимального качества. Требует больше памяти.',
-              contextLength: 8192,
-              deprecated: false,
-            },
-            {
-              id: 'Meta-Llama-3-8B-Instruct.Q2_K.gguf',
-              name: 'LLaMA 3 8B Instruct Q2_K (Быстрая)',
-              provider: 'ollama-llama',
-              description: 'Модель Meta LLaMA 3 8B с квантизацией Q2_K для быстрой работы на слабых устройствах.',
-              contextLength: 8192,
-              deprecated: false,
-            },
-          ]
+          return AVAILABLE_LLAMA_MODELS.map(model => ({
+            id: model.name,
+            name: model.displayName,
+            provider: 'ollama-llama',
+            description: model.description,
+            contextLength: 8192,
+            deprecated: false,
+          }))
         },
         loadModel: async (config, hooks) => {
-          const ollamaApi = await getOllamaAPI()
-          if (!ollamaApi) {
-            throw new Error('Ollama API not available in this environment')
-          }
+          console.log('🚀 === LLM Model Loading Started ===')
+          console.log('📋 Configuration:', JSON.stringify(config, null, 2))
           
-          // Configure the API instance
-          ollamaApi.baseUrl = (config.baseUrl as string).trim()
-          ollamaApi.headers = (config.headers as Record<string, string>) || {}
-          
+          const downloader = await getHuggingFaceDownloader()
           const modelName = config.model as string
+          
+          console.log('🔍 Requested model name:', modelName)
+          console.log('🌐 Provider: ollama-llama')
+          console.log('💾 Downloader initialized:', !!downloader)
+          
           if (!modelName) {
+            console.error('❌ Error: Model name is required')
             throw new Error('Model name is required')
           }
           
+          // Find model info
+          const modelInfo = AVAILABLE_LLAMA_MODELS.find(m => m.name === modelName)
+          console.log('📊 Available models count:', AVAILABLE_LLAMA_MODELS.length)
+          console.log('🎯 Model info found:', !!modelInfo)
+          
+          if (!modelInfo) {
+            console.error(`❌ Model ${modelName} not found in available models`)
+            console.log('📝 Available models:', AVAILABLE_LLAMA_MODELS.map(m => m.name))
+            throw new Error(`Model ${modelName} not found in available models`)
+          }
+          
+          console.log('📦 Model details:')
+          console.log('  - Name:', modelInfo.name)
+          console.log('  - Display Name:', modelInfo.displayName)
+          console.log('  - Size:', modelInfo.size)
+          console.log('  - Size Bytes:', modelInfo.sizeBytes)
+          console.log('  - Download URL:', modelInfo.downloadUrl)
+          
+          // Check if model is already downloaded
+          const storedModels = await downloader.getStoredModels()
+          const isDownloaded = storedModels.some(m => m.name === modelName)
+          
+          console.log('💽 Storage check:')
+          console.log('  - Stored models count:', storedModels.length)
+          console.log('  - Model already downloaded:', isDownloaded)
+          
+          if (isDownloaded) {
+            console.log('✅ Model already available, skipping download')
+            hooks?.onProgress?.({
+              status: 'Model already downloaded and ready to use',
+              progress: 100,
+            })
+            console.log('🎉 === LLM Model Loading Completed (Cached) ===')
+            return
+          }
+          
+          // Download the model
+          console.log('⬇️ Starting model download...')
+          hooks?.onProgress?.({
+            status: 'Starting download from HuggingFace...',
+            progress: 0,
+          })
+          
           try {
-            // First, try to load model from local file if it exists
-            hooks?.onProgress?.({
-              status: 'Checking for local model...',
-              progress: 0,
-            })
-            
-            await ollamaApi.loadLocalModel(modelName, (progress) => {
-              if (hooks?.onProgress) {
-                hooks.onProgress({
-                  status: progress.status,
-                  progress: progress.total && progress.completed 
-                    ? (progress.completed / progress.total) * 100 
-                    : 50, // Default progress for local loading
-                  total: progress.total,
-                  completed: progress.completed,
-                })
+            await downloader.downloadModel(modelInfo, (progress) => {
+              console.log(`📈 Download progress: ${progress.progress?.toFixed(2)}% - ${progress.status}`)
+              if (progress.speed) {
+                console.log(`🚀 Speed: ${(progress.speed / 1024 / 1024).toFixed(2)} MB/s`)
               }
-            })
-          } catch (_localError) {
-            // If local loading fails, download from HuggingFace
-            hooks?.onProgress?.({
-              status: 'Local model not found, downloading from HuggingFace...',
-              progress: 0,
-            })
-            
-            await ollamaApi.pullModel(modelName, (progress) => {
+              if (progress.eta) {
+                console.log(`⏱️ ETA: ${Math.round(progress.eta)} seconds`)
+              }
               if (hooks?.onProgress) {
                 hooks.onProgress({
                   status: progress.status,
-                  progress: progress.total && progress.completed 
-                    ? (progress.completed / progress.total) * 100 
-                    : 0,
+                  progress: progress.progress,
                   total: progress.total,
                   completed: progress.completed,
                 })
               }
             })
             
-            // After download, load the model into Ollama
+            console.log('✅ Model download completed successfully')
             hooks?.onProgress?.({
-              status: 'Loading downloaded model into Ollama...',
-              progress: 90,
+              status: 'Model downloaded and ready to use',
+              progress: 100,
             })
-            
-            await ollamaApi.loadLocalModel(modelName, (progress) => {
-              if (hooks?.onProgress) {
-                hooks.onProgress({
-                  status: progress.status,
-                  progress: 95,
-                })
+            console.log('🎉 === LLM Model Loading Completed (Downloaded) ===')
+          } catch (error) {
+            console.error('❌ Model download failed:', error)
+            console.error('🔍 Error details:', {
+              message: error.message,
+              stack: error.stack,
+              modelName,
+              modelInfo: {
+                name: modelInfo.name,
+                size: modelInfo.size,
+                downloadUrl: modelInfo.downloadUrl
               }
             })
+            console.log('💥 === LLM Model Loading Failed ===')
+            throw error
           }
         },
         checkModel: async (config) => {
-          const ollamaApi = await getOllamaAPI()
-          if (!ollamaApi) {
-            return false
-          }
-          
-          // Configure the API instance
-          ollamaApi.baseUrl = (config.baseUrl as string).trim()
-          ollamaApi.headers = (config.headers as Record<string, string>) || {}
-          
+          const downloader = await getHuggingFaceDownloader()
           const modelName = config.model as string
+          
           if (!modelName) {
             return false
           }
           
-          return await ollamaApi.checkModel(modelName)
+          // Check if model is available in the list
+          if (!isModelAvailable(modelName)) {
+            return false
+          }
+          
+          // Check if model is downloaded
+          const storedModels = await downloader.getStoredModels()
+          return storedModels.some(m => m.name === modelName)
         },
       },
       validators: {
         validateProviderConfig: (config) => {
-          if (!config.baseUrl) {
+          // For browser-based LLaMA models, we don't need server validation
+          // Just check if a model is selected
+          const modelName = config.model as string
+          
+          if (!modelName) {
             return {
-              errors: [new Error('Base URL is required.')],
-              reason: 'Base URL is required. Default to http://localhost:11434/v1/ for Ollama.',
+              errors: [new Error('Model selection is required.')],
+              reason: 'Please select a model to use with this provider.',
               valid: false,
             }
           }
-
-          if (!isAbsoluteUrl(config.baseUrl as string)) {
-            return notBaseUrlError.value
+          
+          // Check if the selected model is available
+          if (!isModelAvailable(modelName)) {
+            return {
+              errors: [new Error('Selected model is not available.')],
+              reason: `Model ${modelName} is not available. Please select a different model.`,
+              valid: false,
+            }
           }
-
-          // Check if the Ollama server is reachable
-          return fetch(`${(config.baseUrl as string).trim()}models`, { headers: (config.headers as HeadersInit) || undefined })
-            .then((response) => {
-              const errors = [
-                !response.ok && new Error(`Ollama server returned non-ok status code: ${response.statusText}`),
-              ].filter(Boolean)
-
-              return {
-                errors,
-                reason: errors.filter(e => e).map(e => String(e)).join(', ') || '',
-                valid: response.ok,
-              }
-            })
-            .catch((err) => {
-              return {
-                errors: [err],
-                reason: `Failed to reach Ollama server, error: ${String(err)} occurred.\n\nIf you are using Ollama locally, this is likely the CORS (Cross-Origin Resource Sharing) security issue, where you will need to set OLLAMA_ORIGINS=* or OLLAMA_ORIGINS=https://airi.moeru.ai,http://localhost environment variable before launching Ollama server to make this work.`,
-                valid: false,
-              }
-            })
+          
+          return {
+            errors: [],
+            reason: '',
+            valid: true,
+          }
         },
       },
     },

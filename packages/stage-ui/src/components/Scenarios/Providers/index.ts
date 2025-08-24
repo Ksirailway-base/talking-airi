@@ -7,6 +7,10 @@ export { default as ProviderSettingsContainer } from './ProviderSettingsContaine
 export { default as ProviderSettingsLayout2 } from './ProviderSettingsLayout2.vue'
 export { default as ProviderSettingsLayout } from './ProviderSettingsLayout.vue'
 
+export { default as OllamaModelDownloader } from './OllamaModelDownloader.vue'
+export { default as OllamaProvider } from './ollama.vue'
+export { default as OllamaLlamaProvider } from './Ollama-llama.vue'
+
 export { default as SpeechPlayground } from './SpeechPlayground.vue'
 export { default as SpeechProviderSettings } from './SpeechProviderSettings.vue'
 

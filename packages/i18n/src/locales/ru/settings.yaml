@@ -1,0 +1,143 @@
+animations:
+  stage-transitions:
+    title: Отключить переходы сцены
+  use-page-specific-transitions:
+    description: >
+      Некоторые страницы будут иметь свои собственные переходы, это переопределит переходы сцены
+    title: Использовать переходы для конкретных страниц
+dialogs:
+  onboarding:
+    title: Добро пожаловать в AIRI!
+    description: Давайте настроим вашего первого AI провайдера для начала работы.
+    selectProvider: Выберите AI провайдера
+    configureProvider: Настроить {provider}
+    apiKey: API ключ
+    apiKeyHelp: Получите ваш API ключ от {provider} и вставьте его сюда
+    baseUrl: Базовый URL
+    baseUrlHelp: URL конечной точки API (используйте по умолчанию, если не уверены)
+    accountId: ID аккаунта
+    validating: Проверка конфигурации...
+    validationSuccess: Первая конфигурация успешно проверена.
+    validationFailed: Проверка конфигурации не удалась
+    validationError: 'Ошибка проверки: {error}'
+    skipForNow: Пропустить пока
+    saveAndContinue: Сохранить и продолжить
+    next: Далее
+    start: Давайте сделаем это!
+    select-model: Выберите модель
+language:
+  title: Язык
+  description: >
+    Изменить язык интерфейса AIRI. Это не повлияет на язык ответов персонажа.
+  options:
+    chinese: 简体中文
+    zh-CN: 简体中文
+    zh-Hans: 简体中文
+    english: English
+    en: English
+    en-US: English (US)
+    es: Spanish
+    ru: Русский
+    russian: Русский
+pages:
+  providers:
+    common:
+      section:
+        basic:
+          title: Основные настройки
+          description: Настройте основные параметры провайдера
+        advanced:
+          title: Дополнительные настройки
+          fields:
+            field:
+              headers:
+                label: Заголовки
+                description: Дополнительные HTTP заголовки
+                key:
+                  placeholder: Ключ заголовка
+                value:
+                  placeholder: Значение заголовка
+    provider:
+      ollama:
+        description: ollama.ai
+        title: Ollama
+        model: Модель
+        modelPlaceholder: llama3:8b
+        modelHelp: Укажите название модели, установленной в Ollama
+        apiKeyPlaceholder: API ключ (опционально)
+        advancedHelp1: Base URL используется для подключения к локальному серверу Ollama.
+        advancedHelp2: Если вы используете локальный сервер Ollama, убедитесь, что он запущен и доступен.
+        advancedHelp3: Для удаленного сервера укажите полный URL включая протокол (http:// или https://).
+        modelDownloader:
+          title: Загрузчик моделей
+          description: Загрузите популярные модели напрямую из реестра Ollama
+          downloadButton: Загрузить модель
+          customModelHelp: Введите название модели из реестра Ollama (например, llama3.2:3b, mistral:latest)
+          showPopular: Показать популярные модели
+          enterCustom: Ввести пользовательское название модели
+      ollama-llama:
+        description: Модели LLaMA через HuggingFace
+        title: Ollama LLaMA
+        model: Модель LLaMA
+        modelPlaceholder: Meta-Llama-3-8B-Instruct.Q4_K_M.gguf
+        modelHelp: Выберите модель LLaMA для чата. Большие модели более способны, но требуют больше памяти.
+        apiKeyPlaceholder: API ключ (опционально)
+        advancedHelp1: Base URL используется для подключения к локальному серверу Ollama.
+        advancedHelp2: API ключ требуется только если сервер Ollama настроен с аутентификацией.
+        modelLoaded: Модель загружена
+        downloader:
+          title: Доступные модели
+          description: Загрузите популярные модели LLaMA напрямую из HuggingFace
+          download: Скачать
+          delete: Удалить
+          downloadButton: Загрузить модель
+          downloadProgress: Загрузка модели...
+          downloadComplete: Модель успешно загружена
+          downloadFailed: Ошибка загрузки
+          selectModel: Выберите модель для загрузки
+          modelSize: Размер модели
+          recommended: Рекомендуется
+          balanced: Сбалансированная
+          highQuality: Высокое качество
+          lightweight: Легковесная
+          fast: Быстрая
+          meta: meta
+      openai:
+        description: openai.com
+        title: OpenAI
+    title: Провайдеры
+    description: Настройте провайдеров AI для генерации текста, изображений и других задач
+scene:
+  description: Настройте окружение персонажа
+  title: Сцена
+themes:
+  color-scheme:
+    description: Изменить цветовую схему сцены
+    title: Цветовая схема
+  developer:
+    description: Опции для разработчиков
+    title: Разработчик
+
+common:
+  dismiss: Закрыть
+
+huggingface:
+  downloader:
+    title: HuggingFace Модели
+    description: Загрузка и управление LLaMA моделями из HuggingFace
+  storage:
+    title: Использование хранилища
+  downloaded:
+    title: Загруженные модели
+    date: Загружено
+  downloading:
+    title: Загрузка
+    eta: Осталось
+  available:
+    title: Доступные модели
+  actions:
+    load: Загрузить
+    delete: Удалить
+    cancel: Отменить
+  empty:
+    message: Нет доступных моделей
