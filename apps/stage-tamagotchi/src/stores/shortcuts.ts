@@ -28,7 +28,7 @@ function useVersionedLocalStorage<T>(
   const data = ref(toValue(initialValue))
   const rawValue = useLocalStorage<Versioned<T>>(key, { version: defaultVersion, data: toValue(initialValue) }, options as unknown as UseStorageOptions<Versioned<T>>)
 
-  watch(rawValue, (value) => {
+  watch(rawValue, (_value) => {
     try {
       if ('version' in rawValue.value && rawValue.value.version != null) {
         if (options?.satisfiesVersionBy != null && !options.satisfiesVersionBy(rawValue.value.version)) {
@@ -54,7 +54,7 @@ function useVersionedLocalStorage<T>(
       rawValue.value = { version: defaultVersion, data: toValue(initialValue) }
       data.value = toValue(initialValue)
     }
-    catch (err) {
+    catch {
       // Local storage unmarshal error warning removed
       rawValue.value = { version: defaultVersion, data: toValue(initialValue) }
       data.value = toValue(initialValue)
@@ -77,7 +77,7 @@ export const useShortcutsStore = defineStore('shortcuts', () => {
       group: 'window',
       type: 'move',
       handle: async () => {
-        windowStore.toggleMode(WindowControlMode.MOVE)
+        await windowStore.toggleMode(WindowControlMode.MOVE)
       },
     },
     {
@@ -86,7 +86,7 @@ export const useShortcutsStore = defineStore('shortcuts', () => {
       group: 'window',
       type: 'resize',
       handle: async () => {
-        windowStore.toggleMode(WindowControlMode.RESIZE)
+        await windowStore.toggleMode(WindowControlMode.RESIZE)
       },
     },
     {
