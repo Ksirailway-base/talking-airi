@@ -127,10 +127,6 @@ export const models = [
         language_id: 'uk',
         name: 'Ukrainian',
       },
-      {
-        language_id: 'ru',
-        name: 'Russian',
-      },
     ],
     model_rates: {
       character_cost_multiplier: 1,
@@ -192,10 +188,6 @@ export const models = [
       {
         language_id: 'es',
         name: 'Spanish',
-      },
-      {
-        language_id: 'ru',
-        name: 'Russian',
       },
       {
         language_id: 'id',
@@ -342,10 +334,6 @@ export const models = [
       {
         language_id: 'es',
         name: 'Spanish',
-      },
-      {
-        language_id: 'ru',
-        name: 'Russian',
       },
       {
         language_id: 'id',
@@ -628,10 +616,6 @@ export const models = [
       {
         language_id: 'es',
         name: 'Spanish',
-      },
-      {
-        language_id: 'ru',
-        name: 'Russian',
       },
       {
         language_id: 'id',
