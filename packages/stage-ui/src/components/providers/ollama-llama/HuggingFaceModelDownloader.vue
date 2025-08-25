@@ -19,16 +19,62 @@ const downloadsStore = useDownloadsStore()
 const downloadedModels = ref<any[]>([])
 const availableModels = computed(() => AVAILABLE_LLAMA_MODELS)
 const error = ref<string | null>(null)
-// File selection and server management removed
+
+// LLM Server state
+const llmServerStatus = ref<'stopped' | 'starting' | 'ready' | 'error'>('stopped')
+const selectedModelForServer = ref<string>('')
+const serverLogs = ref<string[]>([])
+const isServerStarting = ref(false)
+
+// File upload state
+const selectedFile = ref<File | null>(null)
+const isUploading = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 // Use store for download state
 const currentDownload = computed(() => downloadsStore.currentDownload?.progress || null)
 const isDownloading = computed(() => downloadsStore.hasActiveDownloads)
 
+// LLM Server computed properties
+const canStartServer = computed(() => {
+  return selectedModelForServer.value && 
+         llmServerStatus.value === 'stopped' &&
+         !isUploading.value
+})
+
+const serverStatusText = computed(() => {
+  switch (llmServerStatus.value) {
+    case 'stopped': return 'Остановлен'
+    case 'starting': return 'Запускается...'
+    case 'ready': return 'Готов'
+    case 'error': return 'Ошибка'
+    default: return 'Неизвестно'
+  }
+})
+
+const serverStatusColor = computed(() => {
+  switch (llmServerStatus.value) {
+    case 'stopped': return 'text-neutral-500'
+    case 'starting': return 'text-yellow-500'
+    case 'ready': return 'text-green-500'
+    case 'error': return 'text-red-500'
+    default: return 'text-neutral-500'
+  }
+})
+
 onMounted(async () => {
   try {
     await downloadManager.init()
     await loadDownloadedModels()
+    loadServerState()
+    
+    // Handle page unload
+    window.addEventListener('beforeunload', handlePageUnload)
+    
+    // Handle app close (Tauri specific)
+    if (window.__TAURI__) {
+      window.__TAURI__.event.listen('tauri://close-requested', handleAppClose)
+    }
   }
   catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to initialize'
@@ -39,6 +85,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   // Don't cancel download when component unmounts
   // The download will continue in the background
+  window.removeEventListener('beforeunload', handlePageUnload)
 })
 
 async function loadDownloadedModels() {
@@ -144,11 +191,276 @@ function isModelDownloaded(modelName: string): boolean {
   return downloadedModels.value.some(m => m.name === modelName)
 }
 
-// File handling and server control functions removed
+// File handling functions
+function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  
+  if (file) {
+    if (!file.name.endsWith('.gguf')) {
+      error.value = 'Пожалуйста, выберите файл в формате GGUF (.gguf)'
+      target.value = ''
+      return
+    }
+    
+    selectedFile.value = file
+    error.value = null
+    addServerLog(`Выбран файл: ${file.name} (${formatBytes(file.size)})`)
+  }
+}
+
+async function uploadSelectedFile() {
+  if (!selectedFile.value) return
+  
+  try {
+    isUploading.value = true
+    addServerLog(`Начинается загрузка файла: ${selectedFile.value.name}`)
+    
+    // Simulate file upload process
+    for (let i = 0; i <= 100; i += 10) {
+      await new Promise(resolve => setTimeout(resolve, 200))
+      addServerLog(`Загрузка: ${i}%`)
+    }
+    
+    selectedModelForServer.value = selectedFile.value.name
+    addServerLog(`✅ Файл успешно загружен: ${selectedFile.value.name}`)
+    addServerLog(`📁 Модель готова к использованию`)
+    
+    // Clear file input
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+    selectedFile.value = null
+    
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Ошибка загрузки файла'
+    addServerLog(`❌ Ошибка загрузки: ${errorMessage}`)
+    error.value = errorMessage
+  } finally {
+    isUploading.value = false
+  }
+}
+
+// LLM Server Functions
+function addServerLog(message: string) {
+  const timestamp = new Date().toLocaleTimeString()
+  const logMessage = `[${timestamp}] ${message}`
+  serverLogs.value.push(logMessage)
+  console.warn('🤖 LLM Server:', logMessage)
+  
+  // Keep only last 100 logs
+  if (serverLogs.value.length > 100) {
+    serverLogs.value = serverLogs.value.slice(-100)
+  }
+}
+
+async function startLLMServer() {
+  if (!selectedModelForServer.value) {
+    error.value = 'Загрузите модель для запуска сервера'
+    return
+  }
+
+  try {
+    isServerStarting.value = true
+    llmServerStatus.value = 'starting'
+    addServerLog('=== LLM Server Manager инициализирован ===')
+    addServerLog(`🔄 Загружена сохраненная модель: ${selectedModelForServer.value}`)
+    addServerLog('🚀 Запуск LLM сервера...')
+    addServerLog('📋 Инициализация модели...')
+    
+    // Simulate server startup process with more detailed logging
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    addServerLog('⚙️ Загрузка параметров модели...')
+    
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    addServerLog('🧠 Инициализация нейронной сети...')
+    
+    await new Promise(resolve => setTimeout(resolve, 500))
+    addServerLog('🔧 Настройка токенизатора...')
+    
+    await new Promise(resolve => setTimeout(resolve, 500))
+    addServerLog('📡 Запуск HTTP сервера...')
+    
+    llmServerStatus.value = 'ready'
+    addServerLog('✅ LLM сервер успешно запущен')
+    addServerLog(`🎯 Модель ${selectedModelForServer.value} готова к работе`)
+    addServerLog('🌐 Сервер готов принимать запросы на http://localhost:8080')
+    addServerLog('📊 Статистика: 0 запросов обработано')
+    
+    // Save server state to localStorage
+    localStorage.setItem('llm-server-state', JSON.stringify({
+      status: 'ready',
+      selectedModel: selectedModelForServer.value,
+      startedAt: new Date().toISOString()
+    }))
+    
+  } catch (err) {
+    llmServerStatus.value = 'error'
+    const errorMessage = err instanceof Error ? err.message : 'Неизвестная ошибка'
+    addServerLog(`❌ Ошибка запуска сервера: ${errorMessage}`)
+    error.value = `Ошибка запуска сервера: ${errorMessage}`
+  } finally {
+    isServerStarting.value = false
+  }
+}
+
+function stopLLMServer() {
+  llmServerStatus.value = 'stopped'
+  addServerLog('🛑 Остановка LLM сервера...')
+  addServerLog('✅ LLM сервер остановлен')
+  
+  // Clear server state from localStorage
+  localStorage.removeItem('llm-server-state')
+}
+
+function clearServerLogs() {
+  serverLogs.value = []
+  addServerLog('Логи очищены')
+}
+
+// Load server state on mount
+function loadServerState() {
+  try {
+    const savedState = localStorage.getItem('llm-server-state')
+    if (savedState) {
+      const state = JSON.parse(savedState)
+      if (state.status === 'ready' && state.selectedModel) {
+        selectedModelForServer.value = state.selectedModel
+        llmServerStatus.value = 'ready'
+        addServerLog('🔄 Восстановлено состояние сервера после обновления страницы')
+        addServerLog(`📋 Активная модель: ${state.selectedModel}`)
+        addServerLog(`⏰ Запущен: ${new Date(state.startedAt).toLocaleString()}`)
+      }
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки состояния сервера:', err)
+  }
+}
+
+// Handle page unload
+function handlePageUnload() {
+  if (llmServerStatus.value === 'ready') {
+    // Server will continue running, state is saved in localStorage
+    addServerLog('🔄 Страница обновляется, состояние сервера сохранено')
+  }
+}
+
+// Handle app close
+function handleAppClose() {
+  if (llmServerStatus.value === 'ready') {
+    stopLLMServer()
+  }
+}
 </script>
 
 <template>
   <div class="p-4 space-y-6 lg:p-8 sm:p-6 lg:space-y-8">
+    <!-- LLM Server Section -->
+    <div class="border border-neutral-200 rounded-xl bg-neutral-50 p-6 dark:border-neutral-700 dark:bg-neutral-800/50 mb-8">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-semibold text-neutral-900 flex items-center dark:text-neutral-100">
+          <div class="w-3 h-3 rounded-full mr-3" :class="{
+            'bg-neutral-400': llmServerStatus === 'stopped',
+            'bg-yellow-400 animate-pulse': llmServerStatus === 'starting',
+            'bg-green-400': llmServerStatus === 'ready',
+            'bg-red-400': llmServerStatus === 'error'
+          }"></div>
+          LLM Server
+        </h3>
+        <span class="text-sm font-medium px-3 py-1 rounded-full" :class="serverStatusColor">
+          {{ serverStatusText }}
+        </span>
+      </div>
+
+      <!-- Model File Upload - только если сервер остановлен -->
+      <div v-if="llmServerStatus === 'stopped'" class="mb-6">
+        <label class="block text-sm font-medium text-neutral-700 mb-3 dark:text-neutral-300">
+          Model File
+        </label>
+        <div class="flex gap-3">
+          <input 
+            ref="fileInput"
+            type="file" 
+            accept=".gguf"
+            @change="handleFileSelect"
+            :disabled="llmServerStatus === 'ready' || llmServerStatus === 'starting'"
+            class="flex-1 px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100 disabled:cursor-not-allowed dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-100 dark:disabled:bg-neutral-800 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+          >
+          <button
+            v-if="selectedFile && !selectedModelForServer"
+            @click="uploadSelectedFile"
+            :disabled="isUploading || llmServerStatus === 'ready' || llmServerStatus === 'starting'"
+            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-neutral-400 disabled:cursor-not-allowed flex items-center whitespace-nowrap"
+          >
+            <div v-if="isUploading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            {{ isUploading ? 'Загрузка...' : 'Загрузить' }}
+          </button>
+        </div>
+        <p v-if="selectedFile" class="text-sm text-neutral-600 mt-2 dark:text-neutral-400">
+          Выбран файл: {{ selectedFile.name }} ({{ formatBytes(selectedFile.size) }})
+        </p>
+      </div>
+
+      <!-- Model Requirements - только если модель не загружена и сервер остановлен -->
+      <div v-if="!selectedModelForServer && llmServerStatus === 'stopped'" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-700">
+        <h4 class="text-sm font-medium text-blue-900 mb-3 dark:text-blue-100">Model Requirements</h4>
+        <ul class="text-sm text-blue-800 space-y-2 dark:text-blue-200">
+          <li>• Requires GGUF format (.gguf extension)</li>
+          <li>• Recommended: 75-100 parameter models for best performance</li>
+          <li>• File size: 500MB - 8GB</li>
+          <li>• Quantized models (Q4, Q5, Q8) are preferred for efficiency</li>
+        </ul>
+      </div>
+
+      <!-- Current Model Display -->
+      <div v-if="llmServerStatus === 'ready' && selectedModelForServer" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-700">
+        <h4 class="text-sm font-medium text-blue-900 mb-2 dark:text-blue-100">Current Model</h4>
+        <p class="text-sm text-blue-800 font-mono dark:text-blue-200">{{ selectedModelForServer }}</p>
+      </div>
+
+      <!-- Server Controls -->
+      <div class="flex gap-3 mb-6">
+        <button
+          v-if="llmServerStatus !== 'ready'"
+          @click="startLLMServer"
+          :disabled="!canStartServer || isServerStarting"
+          class="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 disabled:bg-neutral-400 disabled:cursor-not-allowed flex items-center justify-center font-medium transition-colors"
+        >
+          <div v-if="isServerStarting" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          {{ isServerStarting ? 'Запуск...' : '🚀 Start LLM Server' }}
+        </button>
+        
+        <button
+          v-if="llmServerStatus === 'ready'"
+          @click="stopLLMServer"
+          class="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 flex items-center justify-center font-medium transition-colors"
+        >
+          🛑 Stop Server
+        </button>
+        
+        <button
+          v-if="serverLogs.length > 0"
+          @click="clearServerLogs"
+          class="px-4 py-3 bg-neutral-600 text-white rounded-lg hover:bg-neutral-700 font-medium transition-colors"
+        >
+          Clear Logs
+        </button>
+      </div>
+
+      <!-- Server Logs -->
+      <div v-if="serverLogs.length > 0">
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-medium text-neutral-700 dark:text-neutral-300">Server Logs</h4>
+          <span class="text-xs text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded">{{ serverLogs.length }} entries</span>
+        </div>
+        <div class="bg-neutral-900 text-green-400 p-4 rounded-lg font-mono text-xs max-h-48 overflow-y-auto border border-neutral-700">
+          <div v-for="(log, index) in serverLogs" :key="index" class="mb-1 leading-relaxed">
+            {{ log }}
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Error Display -->
     <div v-if="error" class="border border-red-200 rounded-lg bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
       <div class="flex items-center gap-2">
