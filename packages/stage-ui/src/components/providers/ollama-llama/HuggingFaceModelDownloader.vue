@@ -37,9 +37,9 @@ const isDownloading = computed(() => downloadsStore.hasActiveDownloads)
 
 // LLM Server computed properties
 const canStartServer = computed(() => {
-  return selectedModelForServer.value && 
-         llmServerStatus.value === 'stopped' &&
-         !isUploading.value
+  return selectedModelForServer.value
+    && llmServerStatus.value === 'stopped'
+    && !isUploading.value
 })
 
 const serverStatusText = computed(() => {
@@ -67,10 +67,10 @@ onMounted(async () => {
     await downloadManager.init()
     await loadDownloadedModels()
     loadServerState()
-    
+
     // Handle page unload
     window.addEventListener('beforeunload', handlePageUnload)
-    
+
     // Handle app close (Tauri specific)
     if (window.__TAURI__) {
       window.__TAURI__.event.listen('tauri://close-requested', handleAppClose)
@@ -195,14 +195,14 @@ function isModelDownloaded(modelName: string): boolean {
 function handleFileSelect(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
-  
+
   if (file) {
     if (!file.name.endsWith('.gguf')) {
       error.value = 'Пожалуйста, выберите файл в формате GGUF (.gguf)'
       target.value = ''
       return
     }
-    
+
     selectedFile.value = file
     error.value = null
     addServerLog(`Выбран файл: ${file.name} (${formatBytes(file.size)})`)
@@ -210,33 +210,35 @@ function handleFileSelect(event: Event) {
 }
 
 async function uploadSelectedFile() {
-  if (!selectedFile.value) return
-  
+  if (!selectedFile.value)
+    return
+
   try {
     isUploading.value = true
     addServerLog(`Начинается загрузка файла: ${selectedFile.value.name}`)
-    
+
     // Simulate file upload process
     for (let i = 0; i <= 100; i += 10) {
       await new Promise(resolve => setTimeout(resolve, 200))
       addServerLog(`Загрузка: ${i}%`)
     }
-    
+
     selectedModelForServer.value = selectedFile.value.name
     addServerLog(`✅ Файл успешно загружен: ${selectedFile.value.name}`)
     addServerLog(`📁 Модель готова к использованию`)
-    
+
     // Clear file input
     if (fileInput.value) {
       fileInput.value.value = ''
     }
     selectedFile.value = null
-    
-  } catch (err) {
+  }
+  catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Ошибка загрузки файла'
     addServerLog(`❌ Ошибка загрузки: ${errorMessage}`)
     error.value = errorMessage
-  } finally {
+  }
+  finally {
     isUploading.value = false
   }
 }
@@ -247,7 +249,7 @@ function addServerLog(message: string) {
   const logMessage = `[${timestamp}] ${message}`
   serverLogs.value.push(logMessage)
   console.warn('🤖 LLM Server:', logMessage)
-  
+
   // Keep only last 100 logs
   if (serverLogs.value.length > 100) {
     serverLogs.value = serverLogs.value.slice(-100)
@@ -267,39 +269,40 @@ async function startLLMServer() {
     addServerLog(`🔄 Загружена сохраненная модель: ${selectedModelForServer.value}`)
     addServerLog('🚀 Запуск LLM сервера...')
     addServerLog('📋 Инициализация модели...')
-    
+
     // Simulate server startup process with more detailed logging
     await new Promise(resolve => setTimeout(resolve, 1000))
     addServerLog('⚙️ Загрузка параметров модели...')
-    
+
     await new Promise(resolve => setTimeout(resolve, 1000))
     addServerLog('🧠 Инициализация нейронной сети...')
-    
+
     await new Promise(resolve => setTimeout(resolve, 500))
     addServerLog('🔧 Настройка токенизатора...')
-    
+
     await new Promise(resolve => setTimeout(resolve, 500))
     addServerLog('📡 Запуск HTTP сервера...')
-    
+
     llmServerStatus.value = 'ready'
     addServerLog('✅ LLM сервер успешно запущен')
     addServerLog(`🎯 Модель ${selectedModelForServer.value} готова к работе`)
     addServerLog('🌐 Сервер готов принимать запросы на http://localhost:8080')
     addServerLog('📊 Статистика: 0 запросов обработано')
-    
+
     // Save server state to localStorage
     localStorage.setItem('llm-server-state', JSON.stringify({
       status: 'ready',
       selectedModel: selectedModelForServer.value,
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
     }))
-    
-  } catch (err) {
+  }
+  catch (err) {
     llmServerStatus.value = 'error'
     const errorMessage = err instanceof Error ? err.message : 'Неизвестная ошибка'
     addServerLog(`❌ Ошибка запуска сервера: ${errorMessage}`)
     error.value = `Ошибка запуска сервера: ${errorMessage}`
-  } finally {
+  }
+  finally {
     isServerStarting.value = false
   }
 }
@@ -308,7 +311,7 @@ function stopLLMServer() {
   llmServerStatus.value = 'stopped'
   addServerLog('🛑 Остановка LLM сервера...')
   addServerLog('✅ LLM сервер остановлен')
-  
+
   // Clear server state from localStorage
   localStorage.removeItem('llm-server-state')
 }
@@ -332,7 +335,8 @@ function loadServerState() {
         addServerLog(`⏰ Запущен: ${new Date(state.startedAt).toLocaleString()}`)
       }
     }
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Ошибка загрузки состояния сервера:', err)
   }
 }
@@ -356,54 +360,58 @@ function handleAppClose() {
 <template>
   <div class="p-4 space-y-6 lg:p-8 sm:p-6 lg:space-y-8">
     <!-- LLM Server Section -->
-    <div class="border border-neutral-200 rounded-xl bg-neutral-50 p-6 dark:border-neutral-700 dark:bg-neutral-800/50 mb-8">
-      <div class="flex items-center justify-between mb-6">
-        <h3 class="text-lg font-semibold text-neutral-900 flex items-center dark:text-neutral-100">
-          <div class="w-3 h-3 rounded-full mr-3" :class="{
-            'bg-neutral-400': llmServerStatus === 'stopped',
-            'bg-yellow-400 animate-pulse': llmServerStatus === 'starting',
-            'bg-green-400': llmServerStatus === 'ready',
-            'bg-red-400': llmServerStatus === 'error'
-          }"></div>
+    <div class="mb-8 border border-neutral-200 rounded-xl bg-neutral-50 p-6 dark:border-neutral-700 dark:bg-neutral-800/50">
+      <div class="mb-6 flex items-center justify-between">
+        <h3 class="flex items-center text-lg text-neutral-900 font-semibold dark:text-neutral-100">
+          <div
+            class="mr-3 h-3 w-3 rounded-full" :class="{
+              'bg-neutral-400': llmServerStatus === 'stopped',
+              'bg-yellow-400 animate-pulse': llmServerStatus === 'starting',
+              'bg-green-400': llmServerStatus === 'ready',
+              'bg-red-400': llmServerStatus === 'error',
+            }"
+          />
           LLM Server
         </h3>
-        <span class="text-sm font-medium px-3 py-1 rounded-full" :class="serverStatusColor">
+        <span class="rounded-full px-3 py-1 text-sm font-medium" :class="serverStatusColor">
           {{ serverStatusText }}
         </span>
       </div>
 
       <!-- Model File Upload - только если сервер остановлен -->
       <div v-if="llmServerStatus === 'stopped'" class="mb-6">
-        <label class="block text-sm font-medium text-neutral-700 mb-3 dark:text-neutral-300">
+        <label class="mb-3 block text-sm text-neutral-700 font-medium dark:text-neutral-300">
           Model File
         </label>
         <div class="flex gap-3">
-          <input 
+          <input
             ref="fileInput"
-            type="file" 
+            type="file"
             accept=".gguf"
-            @change="handleFileSelect"
             :disabled="llmServerStatus === 'ready' || llmServerStatus === 'starting'"
-            class="flex-1 px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-neutral-100 disabled:cursor-not-allowed dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-100 dark:disabled:bg-neutral-800 file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+            class="flex-1 border border-neutral-300 rounded-md px-3 py-2 file:mr-4 disabled:cursor-not-allowed file:border-0 dark:border-neutral-600 file:rounded dark:bg-neutral-700 disabled:bg-neutral-100 file:bg-primary-50 file:px-2 file:py-1 file:text-sm dark:text-neutral-100 file:text-primary-700 file:font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 dark:disabled:bg-neutral-800 hover:file:bg-primary-100"
+            @change="handleFileSelect"
           >
           <button
             v-if="selectedFile && !selectedModelForServer"
-            @click="uploadSelectedFile"
             :disabled="isUploading || llmServerStatus === 'ready' || llmServerStatus === 'starting'"
-            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-neutral-400 disabled:cursor-not-allowed flex items-center whitespace-nowrap"
+            class="flex items-center whitespace-nowrap rounded-md bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-neutral-400 hover:bg-blue-700"
+            @click="uploadSelectedFile"
           >
-            <div v-if="isUploading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            <div v-if="isUploading" class="mr-2 h-4 w-4 animate-spin border-b-2 border-white rounded-full" />
             {{ isUploading ? 'Загрузка...' : 'Загрузить' }}
           </button>
         </div>
-        <p v-if="selectedFile" class="text-sm text-neutral-600 mt-2 dark:text-neutral-400">
+        <p v-if="selectedFile" class="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
           Выбран файл: {{ selectedFile.name }} ({{ formatBytes(selectedFile.size) }})
         </p>
       </div>
 
       <!-- Model Requirements - только если модель не загружена и сервер остановлен -->
-      <div v-if="!selectedModelForServer && llmServerStatus === 'stopped'" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-700">
-        <h4 class="text-sm font-medium text-blue-900 mb-3 dark:text-blue-100">Model Requirements</h4>
+      <div v-if="!selectedModelForServer && llmServerStatus === 'stopped'" class="mb-6 border border-blue-200 rounded-lg bg-blue-50 p-4 dark:border-blue-700 dark:bg-blue-900/20">
+        <h4 class="mb-3 text-sm text-blue-900 font-medium dark:text-blue-100">
+          Model Requirements
+        </h4>
         <ul class="text-sm text-blue-800 space-y-2 dark:text-blue-200">
           <li>• Requires GGUF format (.gguf extension)</li>
           <li>• Recommended: 75-100 parameter models for best performance</li>
@@ -413,35 +421,39 @@ function handleAppClose() {
       </div>
 
       <!-- Current Model Display -->
-      <div v-if="llmServerStatus === 'ready' && selectedModelForServer" class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-700">
-        <h4 class="text-sm font-medium text-blue-900 mb-2 dark:text-blue-100">Current Model</h4>
-        <p class="text-sm text-blue-800 font-mono dark:text-blue-200">{{ selectedModelForServer }}</p>
+      <div v-if="llmServerStatus === 'ready' && selectedModelForServer" class="mb-6 border border-blue-200 rounded-lg bg-blue-50 p-4 dark:border-blue-700 dark:bg-blue-900/20">
+        <h4 class="mb-2 text-sm text-blue-900 font-medium dark:text-blue-100">
+          Current Model
+        </h4>
+        <p class="text-sm text-blue-800 font-mono dark:text-blue-200">
+          {{ selectedModelForServer }}
+        </p>
       </div>
 
       <!-- Server Controls -->
-      <div class="flex gap-3 mb-6">
+      <div class="mb-6 flex gap-3">
         <button
           v-if="llmServerStatus !== 'ready'"
-          @click="startLLMServer"
           :disabled="!canStartServer || isServerStarting"
-          class="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 disabled:bg-neutral-400 disabled:cursor-not-allowed flex items-center justify-center font-medium transition-colors"
+          class="flex flex-1 items-center justify-center rounded-lg bg-green-600 px-4 py-3 text-white font-medium transition-colors disabled:cursor-not-allowed disabled:bg-neutral-400 hover:bg-green-700"
+          @click="startLLMServer"
         >
-          <div v-if="isServerStarting" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          <div v-if="isServerStarting" class="mr-2 h-4 w-4 animate-spin border-b-2 border-white rounded-full" />
           {{ isServerStarting ? 'Запуск...' : '🚀 Start LLM Server' }}
         </button>
-        
+
         <button
           v-if="llmServerStatus === 'ready'"
+          class="flex flex-1 items-center justify-center rounded-lg bg-red-600 px-4 py-3 text-white font-medium transition-colors hover:bg-red-700"
           @click="stopLLMServer"
-          class="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 flex items-center justify-center font-medium transition-colors"
         >
           🛑 Stop Server
         </button>
-        
+
         <button
           v-if="serverLogs.length > 0"
+          class="rounded-lg bg-neutral-600 px-4 py-3 text-white font-medium transition-colors hover:bg-neutral-700"
           @click="clearServerLogs"
-          class="px-4 py-3 bg-neutral-600 text-white rounded-lg hover:bg-neutral-700 font-medium transition-colors"
         >
           Clear Logs
         </button>
@@ -449,11 +461,13 @@ function handleAppClose() {
 
       <!-- Server Logs -->
       <div v-if="serverLogs.length > 0">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="text-sm font-medium text-neutral-700 dark:text-neutral-300">Server Logs</h4>
-          <span class="text-xs text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded">{{ serverLogs.length }} entries</span>
+        <div class="mb-3 flex items-center justify-between">
+          <h4 class="text-sm text-neutral-700 font-medium dark:text-neutral-300">
+            Server Logs
+          </h4>
+          <span class="rounded bg-neutral-100 px-2 py-1 text-xs text-neutral-500 dark:bg-neutral-800">{{ serverLogs.length }} entries</span>
         </div>
-        <div class="bg-neutral-900 text-green-400 p-4 rounded-lg font-mono text-xs max-h-48 overflow-y-auto border border-neutral-700">
+        <div class="max-h-48 overflow-y-auto border border-neutral-700 rounded-lg bg-neutral-900 p-4 text-xs text-green-400 font-mono">
           <div v-for="(log, index) in serverLogs" :key="index" class="mb-1 leading-relaxed">
             {{ log }}
           </div>
